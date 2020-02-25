@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#define PI 3.14159265
+
 #define WIDTH 1920
 #define HEIGHT 1080
 
@@ -16,25 +18,24 @@
 #define MEDIUM 1
 #define HARD 2
 
-#define NUM_RADIUS 2
-#define NUM_DISTANCE 1
-#define NUM_VELOCITY 3
-#define NUM_ANGLE 5
-
-#define ANGLE_TOWARDS 0
-#define ANGLE_DIAGONAL_TOWARDS 1
-#define ANGLE_PERPENDICULAR 2
-#define ANGLE_DIAGONAL_AWAY 3
-#define ANGLE_AWAY 4
-#define ANGLE_NONE 5
+#define NUM_WIDTH 15
+#define NUM_DISTANCE 10
 
 #define MAX_CLICKS 10000
 
 #define DEBUG 0
 
 #define TARGET_COLOR 0xFF000000
+#define COLOR_BLACK 0xFF000000
+#define COLOR_WHITE 0xFFFFFFFF
+#define COLOR_RED 0xFF0000FF
+#define COLOR_HEIDENELKE 0xFF4B009C
+#define COLOR_HEIDENELKE_LIGHT 0xFF8B40DC
+#define BACKGROUND_COLOR 0xFFCCCCCC
 
-#define NUM_ITERATIONS NUM_RADIUS * NUM_DISTANCE * NUM_VELOCITY * NUM_ANGLE * 2
+#define NUM_TARGET 20
+
+#define NUM_ITERATIONS NUM_WIDTH * NUM_DISTANCE
 
 #define LOG_PATH "log"
 
@@ -45,60 +46,61 @@ extern int LATENCY_CLICK_MAX;
 extern int LATENCY_MOVE_MIN;
 extern int LATENCY_MOVE_MAX;
 
-extern int TARGET_RADIUS[NUM_RADIUS];
+extern int TARGET_WIDTH[NUM_WIDTH];
 extern int TARGET_DISTANCE[NUM_DISTANCE];
-extern int TARGET_VELOCITY[NUM_VELOCITY];
-extern int TARGET_ANGLE[NUM_ANGLE];
 
-extern int isSetupTarget;
 extern int click_count_total;
 
-static const char *ANGLE_STRING[] = {
-    "towards", "towards_diagonal", "perpendicular", "away_diagonal", "away", "none",
-};
+extern int current_target;
 
 typedef struct {
-    int r;
+    int w;
     int d;
-    int v;
-    int a;
 } TargetTemplate;
 
 typedef struct {
     double x;
     double y;
-    int r;
+    int w;
     int d;
-    int v;
-    int a;
-    double vX;
-    double vY;
+    int n;
 } Target;
+
+//typedef struct {
+//    int id;
+//    long timestamp;
+//    int w;
+//    int d;
+//    double time;
+//    int clicks;
+//    int travel_distance;
+//    int num_targets;
+//} Sequence;
 
 typedef struct {
     int id;
+    int sequence;
+    int trial;
     long timestamp;
     int w;
     int d;
-    int v;
-    int a;
     int x_target;
     int y_target;
     int x_cursor;
     int y_cursor;
+    int x_cursor_start;
+    int y_cursor_start;
     double time; // in ms
     int clicks;
     int travel_distance;
-    int success;
 } Trial;
 
 typedef struct {
     int id;
+    int sequence;
     long timestamp;
     int w;
     int d;
-    int v;
-    int a;
     int x_target;
     int y_target;
     int x_cursor;
@@ -107,17 +109,18 @@ typedef struct {
     int success;
 } Click;
 
-TargetTemplate staticTargetTemplates[NUM_ITERATIONS / 2];
-TargetTemplate movingTargetTemplates[NUM_ITERATIONS / 2];
-TargetTemplate *targetTemplates[NUM_ITERATIONS];
+TargetTemplate targetTemplates[NUM_ITERATIONS];
 
-Trial trials[NUM_ITERATIONS];
 Click clicks[MAX_CLICKS];
 
-// templates
-TargetTemplate createTargetTemplate(int r, int d, int v, int a);
+Trial trials[NUM_TARGET * NUM_ITERATIONS];
 
-Target createTarget(int x, int y, TargetTemplate *targetTemplate);
+//Sequence sequences[NUM_ITERATIONS];
+
+// templates
+TargetTemplate createTargetTemplate(int w, int d);
+
+Target createTarget(int n, int d, int w);
 
 void initTargetTemplates();
 
@@ -140,6 +143,8 @@ int calculateDistance(int x1, int y1, int x2, int y2);
 void logClicks();
 
 void logTrials();
+
+//void logSequences();
 
 // main
 void finish();

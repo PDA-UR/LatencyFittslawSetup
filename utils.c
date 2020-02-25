@@ -26,7 +26,7 @@ int max(int a, int b)
 
 int checkCollision(int x, int y, Target *t)
 {
-    return (pow(x - t->x, 2) + pow(y - t->y, 2) <= pow(t->r, 2));
+    return (pow(x - t->x, 2) + pow(y - t->y, 2) <= pow(t->w / 2, 2));
 }
 
 int calculateDistance(int x1, int y1, int x2, int y2)

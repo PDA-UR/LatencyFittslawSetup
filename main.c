@@ -10,64 +10,44 @@ int LATENCY_MOVE_MAX = 0;
 int iteration = 0;
 int click_count = 0;
 int click_count_total = 0;
-double trial_time;
-int travel_distance;
+//int click_count_sequence = 0;
+int travel_distance = 0;
+int travel_distance_sequence = 0;
 int lastX;
 int lastY;
+int cursor_x_start = 0;
+int cursor_y_start = 0;
 
-int isSetupTarget = 1;
+double trial_time = 0;
+//double sequence_time = 0;
 
-Trial current_trial;
-
-// too many permutations
-// throw something out or simply cut after randomizing?
-//int TARGET_RADIUS[3] = {75, 50, 25};
-//int TARGET_DISTANCE[3] = {500, 400, 300};
-//int TARGET_VELOCITY[3] = {200, 350, 500};
-
-int TARGET_RADIUS[NUM_RADIUS] = {50, 30};
-int TARGET_DISTANCE[NUM_DISTANCE] = {500};
-int TARGET_VELOCITY[NUM_VELOCITY] = {200, 300, 400};
-int TARGET_ANGLE[NUM_ANGLE] = {ANGLE_TOWARDS, ANGLE_DIAGONAL_TOWARDS, ANGLE_PERPENDICULAR, ANGLE_DIAGONAL_AWAY, ANGLE_AWAY};
-
-// starting target
-Target target = {WIDTH / 2 - 50, HEIGHT / 2 - 50, 100, 0, 0};
+int TARGET_WIDTH[NUM_WIDTH] = {100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30}; // 15
+int TARGET_DISTANCE[NUM_DISTANCE] = {650, 600, 550, 500, 450, 400, 350, 300, 250, 200}; // 10
 
 int mouse_down = 0;
 
+Target targets[NUM_TARGET];
 
+int current_target;
+
+void initTargets()
+{
+    for(int i = 0; i < NUM_TARGET; i++)
+    {
+        targets[i] = createTarget(i, targetTemplates[iteration].d, targetTemplates[iteration].w);
+    }
+
+    current_target = 0;
+
+    if(iteration >= NUM_ITERATIONS) finish();
+}
 
 void finish()
 {
+    // write log files
     logClicks();
     logTrials();
-    // write log files
-
-    // print Trials
-    /*
-    for(int i = 0; i < NUM_ITERATIONS; i++)
-    {
-        printf("%d %ld | %d %d %d %d | %d %d %d %d | %f %d %d %d\n", trials[i].id, trials[i].timestamp, trials[i].w, trials[i].d, trials[i].v, trials[i].a, trials[i].x_target, trials[i].y_target, trials[i].x_cursor, trials[i].y_cursor, trials[i].time, trials[i].clicks, trials[i].travel_distance, trials[i].success);
-    }
-    */
-
-    // print clicks
-    //for(int i = 0; i < click_count_total; i++)
-    //{
-    //    printf("%d %ld | %d %d %d %d | %d %d %d %d | %d %d\n", 
-    //            clicks[i].id,
-    //            clicks[i].timestamp,
-    //            clicks[i].w,
-    //            clicks[i].d,
-    //            clicks[i].v,
-    //            clicks[i].a,
-    //            clicks[i].x_target,
-    //            clicks[i].y_target,
-    //            clicks[i].x_cursor,
-    //            clicks[i].y_cursor,
-    //            clicks[i].distance,
-    //            clicks[i].success);
-    //}
+    //logSequences();
 
     SDL_Quit();
     exit(1);
@@ -83,98 +63,81 @@ void handleInput()
         {
             if (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
             {
-		mouse_down = 1;
+        		mouse_down = 1;
 
                 int mouseX, mouseY;
 
                 SDL_GetMouseState(&mouseX, &mouseY);
 
-                int success = checkCollision(mouseX, mouseY, &target);
+                Target target = targets[current_target];
 
-                if(!isSetupTarget)
+                int success = checkCollision(mouseX, mouseY, &target);
+                
+                // handle click
+                Click click = { click_count_total,
+                                iteration,
+                                millis(),
+                                target.w,
+                                target.d,
+                                target.x,
+                                target.y,
+                                mouseX,
+                                mouseY,
+                                max(calculateDistance(target.x, target.y, mouseX, mouseY) - target.w / 2, 0),
+                                success};
+
+                clicks[click_count_total] = click;
+
+                click_count_total++;
+                click_count++;
+                //click_count_sequence++;
+
+                if(success)
                 {
-                    // handle click
-                    Click click = { click_count_total,
+                    Trial trial = { (iteration * NUM_TARGET) + current_target,
+                                    iteration,
+                                    current_target,
                                     millis(),
-                                    target.r * 2,
+                                    target.w,
                                     target.d,
-                                    target.v,
-                                    target.a,
                                     target.x,
                                     target.y,
                                     mouseX,
                                     mouseY,
-                                    max(calculateDistance(target.x, target.y, mouseX, mouseY) - target.r, 0),
-                                    success};
+                                    cursor_x_start,
+                                    cursor_y_start,
+                                    trial_time,
+                                    click_count,
+                                    travel_distance};
 
-                    clicks[click_count_total] = click;
-                    click_count_total++;
-                }
+                    //printf("%d %d %d %d\n", iteration, NUM_TARGET, current_target, (iteration * NUM_TARGET) + current_target);
+                    trials[(iteration * NUM_TARGET) + current_target] = trial;
+                    // add to array
 
-
-                click_count++;
-
-                if(success)
-                {
-                    if(!isSetupTarget)
-                    {
-                        //printf("success\n");
-                        current_trial.time = trial_time;
-                        current_trial.clicks = click_count;
-                        current_trial.travel_distance = travel_distance;
-                        current_trial.success = 1;
-
-                        trials[iteration] = current_trial;
-
-                        iteration++;   
-                        if(iteration >= NUM_ITERATIONS) finish();
-                    }
-
+                    current_target++;
                     click_count = 0;
                     travel_distance = 0;
                     trial_time = 0;
-                    isSetupTarget = 0;
+                    cursor_x_start = mouseX;
+                    cursor_y_start = mouseY;
 
-                    target = createTarget(mouseX, mouseY, targetTemplates[iteration]);
-
-    		    //printf("main %f %f\n", target.x, target.y);
-
-                    current_trial = (Trial) {iteration,
-                                             millis(),
-                                             target.r * 2,
-                                             target.d,
-                                             target.v,
-                                             target.a,
-                                             target.x,
-                                             target.y,
-                                             mouseX,
-                                             mouseY,
-                                             0,
-                                             0,
-                                             0,
-                                             0};
-
-                    // fixed: was caused by the cursor being too far away from the base line
-                    //if(target.x < -2000)
-                    //{
-                    //    printf("problem here!\n");
-                    //    finish();
-                    //}
-
-                    if(DEBUG > 1) printf("target created: x %f y %f r %d vX %f vY %f\n", target.x, target.y, target.r, target.vX, target.vY);
-
+                    if(current_target == NUM_TARGET)
+                    {
+                        iteration++;
+                        initTargets();
+                    }
                 }
             }
         }
 
-	// test
+	    // test
         if (event.type == SDL_MOUSEBUTTONUP)
         {
             if (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
             {
-		mouse_down = 0;
-		}
-	}
+		        mouse_down = 0;
+		    }
+	    }
 
         if(event.type == SDL_KEYDOWN)
         {
@@ -192,22 +155,28 @@ void handleInput()
 
 void render(SDL_Renderer* renderer)
 {
-    //int mouseX, mouseY;
-    //SDL_GetMouseState(&mouseX, &mouseY);
-
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    //SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_SetRenderDrawColor(renderer, 200, 200, 200, 255);
     SDL_RenderClear(renderer);
 
-    //printf("render %f %f\n", target.x, target.y);
-    filledCircleColor(renderer, target.x, target.y, target.r, TARGET_COLOR);
-    //filledCircleColor(renderer, mouseX, mouseY, 5, 0xFF0000FF);
+    for(int i = NUM_TARGET; i >= current_target; i--)
+    {
+        if(i == current_target) filledCircleColor(renderer, targets[i].x, targets[i].y, targets[i].w / 2, COLOR_HEIDENELKE);
+
+        circleColor(renderer, targets[i].x, targets[i].y, targets[i].w / 2, COLOR_BLACK);
+
+        //else
+        //{
+        //    //filledCircleColor(renderer, targets[i].x, targets[i].y, targets[i].w / 2, COLOR_BLACK);
+        //    //filledCircleColor(renderer, targets[i].x, targets[i].y, (targets[i].w / 2) - 3, COLOR_WHITE);
+        //}
+    }
 
     // circle in bottom right corner used to measure end to end latency
-    //if(!mouse_down)
-    //{
-    //	filledCircleColor(renderer, 1900, 1000, 100, TARGET_COLOR);
-
-    //}
+    if(!mouse_down)
+    {
+    	filledCircleColor(renderer, 1900, 1000, 100, TARGET_COLOR);
+    }
 
     SDL_RenderPresent(renderer);
 }
@@ -217,56 +186,32 @@ void update(double deltaTime)
     int mouseX, mouseY;
     SDL_GetMouseState(&mouseX, &mouseY);
 
-    travel_distance += calculateDistance(mouseX, mouseY, lastX, lastY);
-
     trial_time += deltaTime;
+    //sequence_time += deltaTime;
+
+    int dist = calculateDistance(mouseX, mouseY, lastX, lastY);
+
+    travel_distance += dist;
+    //travel_distance_sequence += dist;
 
     lastX = mouseX;
     lastY = mouseY;
+    
+    //Target target = targets[current_target];
 
-    if(target.a == ANGLE_NONE) return;
-    //printf("before %f %f %f %f\n", target.x, target.y, target.vX, target.vX * deltaTime);
-
-    target.x += target.vX * deltaTime;
-    target.y += target.vY * deltaTime;
-
-    //printf("%lf\n", deltaTime);
-    //printf("after %f %f %f %f\n", target.x, target.y, target.vX, target.vX * deltaTime);
-
-    if( target.x < -target.r * 2 ||
-        target.x > WIDTH + (target.r * 2) ||
-        target.y < -target.r * 2 ||
-        target.y > HEIGHT + (target.r * 2))
-    {
-        //printf("failed\n");
-        current_trial.time = 0;
-        current_trial.clicks = click_count;
-        current_trial.travel_distance = travel_distance;
-        current_trial.success = 0;
-        trials[iteration] = current_trial;
-
-        target = (Target) {WIDTH / 2 - 50, HEIGHT / 2 - 50, 100, 0, 0};
-        click_count = 0;
-        travel_distance = 0;
-        trial_time = 0;
-        isSetupTarget = 1;
-        
-        iteration++;
-        if(iteration >= NUM_ITERATIONS) finish();
-    }
 }
 
 int main(int argc, char** argv)
 {
     if(sscanf(argv[1], "%d", &PARTICIPANT_ID) == EOF) printf("incorrect partcipant id");
-    if(sscanf(argv[2], "%d", &EXPERIMENT) == EOF) printf("incorrect trial id");
+    if(sscanf(argv[2], "%d", &EXPERIMENT) == EOF) printf("incorrect experiment id");
     if(sscanf(argv[3], "%d", &LATENCY_CLICK_MIN) == EOF) printf("incorrect latency click min");
     if(sscanf(argv[4], "%d", &LATENCY_CLICK_MAX) == EOF) printf("incorrect latency click max");
     if(sscanf(argv[5], "%d", &LATENCY_MOVE_MIN) == EOF) printf("incorrect latency move min");
     if(sscanf(argv[6], "%d", &LATENCY_MOVE_MAX) == EOF) printf("incorrect latency move max");
 
-    double timer;
-    double deltaTime;
+    double timer = micros();
+    double deltaTime = 0;
     SDL_Window* window;
     SDL_Renderer* renderer;
 
@@ -284,7 +229,7 @@ int main(int argc, char** argv)
 
     system("xsetroot -cursor_name arrow");
 
-    //thread inputThread(handleInput);
+    initTargets();
 
     while(1)
     {
@@ -294,7 +239,7 @@ int main(int argc, char** argv)
         update(deltaTime);
         handleInput();
         render(renderer);
-	//usleep(2000);
+	    //usleep(2000);
     }
 
     SDL_Quit();
